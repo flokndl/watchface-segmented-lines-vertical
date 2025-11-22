@@ -1,0 +1,16 @@
+# Build artifacts
+build/
+
+# macOS
+.DS_Store
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Pebble SDK
+.pebble/
+
