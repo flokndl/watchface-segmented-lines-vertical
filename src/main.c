@@ -22,7 +22,7 @@ static char debug_time[] = "01:24";
 #define IMAGE_WIDTH 56
 #define IMAGE_HEIGHT 72
 #define TRANSITION_DURATION_MS 500  // Animation duration in milliseconds
-#define DELAY_MS 200  // Delay for image_0 and image_2 transitions
+#define DELAY_MS 100  // Delay between each sequential digit animation
 
 // Helper function to get resource ID for a digit (0-9)
 static uint32_t get_num_resource_id(int digit) {
@@ -151,8 +151,8 @@ static void delayed_animation_callback(void *context) {
   start_digit_animation(digit_index);
 }
 
-// Update a single digit with transition
-static void update_digit_with_transition(int digit_index, int new_digit) {
+// Update a single digit with transition (called with delay offset)
+static void update_digit_with_transition(int digit_index, int new_digit, int delay_ms) {
   // Safety check
   if (digit_index < 0 || digit_index >= 4) {
     return;
@@ -198,11 +198,10 @@ static void update_digit_with_transition(int digit_index, int new_digit) {
   // Update current digit
   s_current_digits[digit_index] = new_digit;
   
-  // For image_0 (index 0) and image_2 (index 2), add delay for staggered animation
-  if (digit_index == 0 || digit_index == 2) {
-    s_delay_timers[digit_index] = app_timer_register(DELAY_MS, delayed_animation_callback, (void*)digit_index);
+  // Start animation with delay (0ms = immediate)
+  if (delay_ms > 0) {
+    s_delay_timers[digit_index] = app_timer_register(delay_ms, delayed_animation_callback, (void*)digit_index);
   } else {
-    // For other digits, start animation immediately
     start_digit_animation(digit_index);
   }
 }
@@ -234,11 +233,32 @@ static void update_time() {
   int minute_tens = minutes / 10;
   int minute_ones = minutes % 10;
   
-  // Update each digit with transition
-  update_digit_with_transition(0, hour_tens);
-  update_digit_with_transition(1, hour_ones);
-  update_digit_with_transition(2, minute_tens);
-  update_digit_with_transition(3, minute_ones);
+  // Check which digits changed
+  bool digits_changed[4] = {
+    s_current_digits[0] != hour_tens,
+    s_current_digits[1] != hour_ones,
+    s_current_digits[2] != minute_tens,
+    s_current_digits[3] != minute_ones
+  };
+  
+  // Calculate cascading delays: first changed digit starts immediately,
+  // each subsequent changed digit starts 100ms after the previous one that changed
+  int previous_changed_count = 0;
+  for (int i = 0; i < 4; i++) {
+    if (digits_changed[i]) {
+      int delay = previous_changed_count * DELAY_MS;
+      if (i == 0) {
+        update_digit_with_transition(0, hour_tens, delay);
+      } else if (i == 1) {
+        update_digit_with_transition(1, hour_ones, delay);
+      } else if (i == 2) {
+        update_digit_with_transition(2, minute_tens, delay);
+      } else if (i == 3) {
+        update_digit_with_transition(3, minute_ones, delay);
+      }
+      previous_changed_count++;
+    }
+  }
   
   // Hide image_0 (hour tens) when value is 0 (single digit hour)
   if (s_mask_layers[0]) {
