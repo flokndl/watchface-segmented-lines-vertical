@@ -45,7 +45,7 @@ static void animation_stopped_handler(Animation *animation, bool finished, void 
     s_new_bitmaps[digit_index] = NULL;
     
     // Reset wrapper position to 0 (showing the "old" which is now the current)
-    layer_set_frame(s_wrapper_layers[digit_index], GRect(0, 0, IMAGE_WIDTH * 2, IMAGE_HEIGHT));
+    layer_set_frame(s_wrapper_layers[digit_index], GRect(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT * 2));
     layer_mark_dirty(s_wrapper_layers[digit_index]);
   }
   
@@ -60,7 +60,7 @@ static void animation_stopped_handler(Animation *animation, bool finished, void 
   }
 }
 
-// Wrapper layer update proc - draws both old and new bitmaps side by side
+// Wrapper layer update proc - draws both old and new bitmaps stacked vertically
 static void wrapper_layer_update_proc(Layer *layer, GContext *ctx) {
   int *digit_index_ptr = (int*)layer_get_data(layer);
   if (!digit_index_ptr) {
@@ -81,10 +81,10 @@ static void wrapper_layer_update_proc(Layer *layer, GContext *ctx) {
                                  GRect(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT));
   }
   
-  // Draw new bitmap at (IMAGE_WIDTH, 0) - side by side
+  // Draw new bitmap at (0, IMAGE_HEIGHT) - stacked vertically
   if (s_new_bitmaps[digit_index]) {
     graphics_draw_bitmap_in_rect(ctx, s_new_bitmaps[digit_index], 
-                                 GRect(IMAGE_WIDTH, 0, IMAGE_WIDTH, IMAGE_HEIGHT));
+                                 GRect(0, IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_HEIGHT));
   }
 }
 
@@ -105,9 +105,9 @@ static void start_digit_animation(int digit_index) {
     s_prop_animations[digit_index] = NULL;
   }
   
-  // Create animation to slide wrapper from 0 to -IMAGE_WIDTH
-  GRect start_frame = GRect(0, 0, IMAGE_WIDTH * 2, IMAGE_HEIGHT);
-  GRect end_frame = GRect(-IMAGE_WIDTH, 0, IMAGE_WIDTH * 2, IMAGE_HEIGHT);
+  // Create animation to slide wrapper from 0 to -IMAGE_HEIGHT (bottom to top)
+  GRect start_frame = GRect(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT * 2);
+  GRect end_frame = GRect(0, -IMAGE_HEIGHT, IMAGE_WIDTH, IMAGE_HEIGHT * 2);
   
   PropertyAnimation *prop_anim = property_animation_create_layer_frame(
     s_wrapper_layers[digit_index],
@@ -234,14 +234,6 @@ static void update_time() {
   int minute_tens = minutes / 10;
   int minute_ones = minutes % 10;
   
-  // Calculate positions
-  int padding_top = 12;
-  int padding_left = 16;
-  int x_positions[4] = {padding_left, padding_left + IMAGE_WIDTH, 
-                        padding_left, padding_left + IMAGE_WIDTH};
-  int y_positions[4] = {padding_top, padding_top,
-                        padding_top + IMAGE_HEIGHT, padding_top + IMAGE_HEIGHT};
-  
   // Update each digit with transition
   update_digit_with_transition(0, hour_tens);
   update_digit_with_transition(1, hour_ones);
@@ -286,8 +278,8 @@ static void main_window_load(Window *window) {
     s_mask_layers[i] = layer_create(GRect(x_positions[i], y_positions[i], IMAGE_WIDTH, IMAGE_HEIGHT));
     layer_set_clips(s_mask_layers[i], true);  // Enable clipping
     
-    // Create wrapper layer (slides inside mask)
-    s_wrapper_layers[i] = layer_create_with_data(GRect(0, 0, IMAGE_WIDTH * 2, IMAGE_HEIGHT), sizeof(int));
+    // Create wrapper layer (slides inside mask) - vertical stacking
+    s_wrapper_layers[i] = layer_create_with_data(GRect(0, 0, IMAGE_WIDTH, IMAGE_HEIGHT * 2), sizeof(int));
     int *wrapper_data = (int*)layer_get_data(s_wrapper_layers[i]);
     *wrapper_data = i;
     layer_set_update_proc(s_wrapper_layers[i], wrapper_layer_update_proc);
